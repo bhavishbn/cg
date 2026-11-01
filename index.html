@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07120f" />
+    <meta name="description" content="APEX RACING — a mountain circuit driving simulator." />
+    <title>APEX RACING — Chamonix Open Map</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="game-canvas" aria-label="3D racing game"></div>
+      <div class="vignette" aria-hidden="true"></div>
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Apex Racing home"><span class="brand-mark">A</span><span>APEX<span class="brand-light"> / RACING</span></span></a>
+        <div class="track-label"><span class="live-dot"></span> REAL MAP <span class="slash">/</span> CHAMONIX, FRANCE</div>
+        <button id="sound-toggle" class="icon-button" aria-label="Toggle engine sound" title="Toggle engine sound">◖</button>
+      </header>
+      <section class="intro" id="intro">
+        <p class="eyebrow"><span class="eyebrow-line"></span> THE MOUNTAIN IS YOURS</p>
+        <h1>FIND YOUR<br /><em>APEX.</em></h1>
+        <p class="intro-copy">Real roads. Real Alpine elevation.<br />Take the wheel through Chamonix.</p>
+        <button id="drive-button" class="drive-button"><span>TAKE THE WHEEL</span><span class="button-arrow">↗</span></button>
+        <div class="quick-spec"><span>01</span><span class="spec-rule"></span><span>CHAMONIX STREETS&nbsp; · &nbsp;FREE DRIVE</span></div>
+      </section>
+      <section class="telemetry" aria-label="Vehicle telemetry">
+        <div class="speed-block"><span id="speed" class="speed">000</span><span class="speed-unit">KM/H</span></div>
+        <div class="telemetry-meta"><span id="gear" class="gear">N</span><span class="meta-divider"></span><span><span class="meta-label">ENGINE</span><br /><span id="rpm">0,000</span> <span class="meta-unit">RPM</span></span></div>
+        <div class="rpm-meter"><div class="rpm-track"><span id="rpm-fill"></span><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="rpm-caption"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span></div></div>
+      </section>
+      <aside class="controls-hint" id="controls-hint"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="hint-copy">DRIVE</span><span class="hint-separator"></span><span class="key">C</span><span class="hint-copy">CAMERA</span><span class="hint-separator"></span><span class="key">P</span><span class="hint-copy">PAUSE</span></aside>
+      <div class="corner-note"><span>45° 55′ 24″ N</span><span>06° 52′ 08″ E</span><span class="note-rule"></span><a class="map-credit" href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noreferrer">IMAGERY © ESRI · MAXAR · EARTHSTAR</a><a class="map-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OPENSTREETMAP CONTRIBUTORS</a><a class="map-credit note-muted" href="https://open-meteo.com/en/docs/elevation-api" target="_blank" rel="noreferrer">COPERNICUS DEM · OPEN-METEO</a></div>
+      <aside class="map-card" aria-label="Live satellite map preview"><div class="map-title"><span>SATELLITE MAP</span><span>LIVE</span></div><canvas id="map-preview" aria-label="Chamonix aerial imagery with mapped roads and car position"></canvas></aside>
+      <div id="toast" class="toast" role="status"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
