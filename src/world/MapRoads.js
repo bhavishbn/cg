@@ -12,9 +12,11 @@ export function createMapRoads(scene, roadData, terrainData) {
   const zMetersPerDegree = 111320;
   const widthMeters = (east - west) * xMetersPerDegree;
   const depthMeters = (north - south) * zMetersPerDegree;
-  const elevations = terrainData?.elevations ?? new Array(17 * 25).fill(1050);
+  const sourceElevations = terrainData?.elevations ?? new Array(17 * 25).fill(1050);
   const gridWidth = terrainData?.width ?? 17;
   const gridHeight = terrainData?.height ?? 25;
+  const elevations = smoothElevationGrid(sourceElevations, gridWidth, gridHeight, 2);
+  const elevationScale = 0.45;
   const baseElevation = Math.min(...elevations);
   const bounds = { west, south, east, north, widthMeters, depthMeters, centerLat, centerLon, xMetersPerDegree, zMetersPerDegree };
   const group = new THREE.Group();
@@ -34,7 +36,7 @@ export function createMapRoads(scene, roadData, terrainData) {
       const gridX = u * (gridWidth - 1);
       const gridZ = v * (gridHeight - 1);
       const elevation = sampleGrid(elevations, gridWidth, gridHeight, gridX, gridZ);
-      terrainPositions.push(-widthMeters / 2 + u * widthMeters, elevation - baseElevation, -depthMeters / 2 + v * depthMeters);
+      terrainPositions.push(-widthMeters / 2 + u * widthMeters, (elevation - baseElevation) * elevationScale, -depthMeters / 2 + v * depthMeters);
       terrainUvs.push(u, 1 - v);
       if (column < terrainMeshWidth - 1 && row < terrainMeshHeight - 1) {
         const a = row * terrainMeshWidth + column;
@@ -69,11 +71,11 @@ export function createMapRoads(scene, roadData, terrainData) {
         const distance = nearest.x * nearest.x + nearest.z * nearest.z;
         if (distance < spawnDistance) {
           spawnDistance = distance;
-          spawn = { x: nearest.x, z: nearest.z, yaw: Math.atan2(b.x - a.x, a.z - b.z), y: elevationAt(nearest.x, nearest.z, elevations, bounds, gridWidth, gridHeight, baseElevation) };
+          spawn = { x: nearest.x, z: nearest.z, yaw: Math.atan2(b.x - a.x, a.z - b.z), y: elevationAt(nearest.x, nearest.z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale) };
         }
       }
     }
-    appendRoadStrip(bucket, points, ROAD_WIDTHS[road.type], elevation => elevationAt(elevation.x, elevation.z, elevations, bounds, gridWidth, gridHeight, baseElevation));
+    appendRoadStrip(bucket, points, ROAD_WIDTHS[road.type], elevation => elevationAt(elevation.x, elevation.z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale));
   }
 
   for (const [type, bucket] of buckets) {
@@ -94,7 +96,7 @@ export function createMapRoads(scene, roadData, terrainData) {
     bounds,
     spawn: spawn ?? { x: 0, z: 0, yaw: 0, y: 0 },
     roadCount: roadData.roads.length,
-    getElevationAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation),
+    getElevationAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale),
     isClearOfRoads: (x, z, margin = 18) => segments.every(([ax, az, bx, bz]) => {
       const nearest = nearestOnSegment(x, z, ax, az, bx, bz);
       return nearest.distanceSquared > margin * margin;
@@ -129,10 +131,35 @@ function appendRoadStrip(bucket, points, width, getElevation) {
   }
 }
 
-function elevationAt(x, z, grid, bounds, gridWidth, gridHeight, baseElevation) {
+function elevationAt(x, z, grid, bounds, gridWidth, gridHeight, baseElevation, elevationScale = 1) {
   const u = THREE.MathUtils.clamp((x + bounds.widthMeters / 2) / bounds.widthMeters, 0, 1) * (gridWidth - 1);
   const v = THREE.MathUtils.clamp((z + bounds.depthMeters / 2) / bounds.depthMeters, 0, 1) * (gridHeight - 1);
-  return sampleGrid(grid, gridWidth, gridHeight, u, v) - baseElevation;
+  return (sampleGrid(grid, gridWidth, gridHeight, u, v) - baseElevation) * elevationScale;
+}
+
+function smoothElevationGrid(source, width, height, passes) {
+  let current = source;
+  for (let pass = 0; pass < passes; pass++) {
+    const next = new Array(current.length);
+    for (let row = 0; row < height; row++) {
+      for (let column = 0; column < width; column++) {
+        let total = 0;
+        let weights = 0;
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const sampleX = THREE.MathUtils.clamp(column + dx, 0, width - 1);
+            const sampleZ = THREE.MathUtils.clamp(row + dz, 0, height - 1);
+            const weight = (dx === 0 ? 2 : 1) * (dz === 0 ? 2 : 1);
+            total += current[sampleZ * width + sampleX] * weight;
+            weights += weight;
+          }
+        }
+        next[row * width + column] = total / weights;
+      }
+    }
+    current = next;
+  }
+  return current;
 }
 
 function sampleGrid(grid, gridWidth, gridHeight, u, v) {

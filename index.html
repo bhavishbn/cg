@@ -33,16 +33,6 @@
       <aside class="map-card" aria-label="Live satellite map preview"><div class="map-title"><span>SATELLITE MAP</span><span>LIVE</span></div><canvas id="map-preview" aria-label="Chamonix aerial imagery with mapped roads and car position"></canvas></aside>
       <div id="toast" class="toast" role="status"></div>
     </div>
-    <script>
-      window.addEventListener('error', event => {
-        const toast = document.querySelector('#toast');
-        if (toast) { toast.textContent = event.error?.stack ?? event.message; toast.classList.add('visible'); }
-      });
-      window.addEventListener('unhandledrejection', event => {
-        const toast = document.querySelector('#toast');
-        if (toast) { toast.textContent = event.reason?.stack ?? event.reason; toast.classList.add('visible'); }
-      });
-    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

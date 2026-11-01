@@ -33,7 +33,7 @@ export function createEnvironment(scene, mapData, terrainData) {
     track = createTrack(scene);
     addRoadsideDetails(scene, track);
   }
-  addForest(scene, track, mapData ? 620 : 290);
+  if (!mapData) addForest(scene, track, 290);
   return { track, spawn: track.spawn };
 }
 
