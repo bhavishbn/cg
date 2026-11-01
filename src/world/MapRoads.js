@@ -24,14 +24,21 @@ export function createMapRoads(scene, roadData, terrainData) {
   const terrainPositions = [];
   const terrainUvs = [];
   const terrainIndices = [];
-  for (let row = 0; row < gridHeight; row++) {
-    for (let column = 0; column < gridWidth; column++) {
-      const elevation = elevations[row * gridWidth + column];
-      terrainPositions.push(-widthMeters / 2 + column / (gridWidth - 1) * widthMeters, elevation - baseElevation, -depthMeters / 2 + row / (gridHeight - 1) * depthMeters);
-      terrainUvs.push(column / (gridWidth - 1), 1 - row / (gridHeight - 1));
-      if (column < gridWidth - 1 && row < gridHeight - 1) {
-        const a = row * gridWidth + column;
-        terrainIndices.push(a, a + gridWidth, a + 1, a + 1, a + gridWidth, a + gridWidth + 1);
+  const terrainSubdivisions = 5;
+  const terrainMeshWidth = (gridWidth - 1) * terrainSubdivisions + 1;
+  const terrainMeshHeight = (gridHeight - 1) * terrainSubdivisions + 1;
+  for (let row = 0; row < terrainMeshHeight; row++) {
+    for (let column = 0; column < terrainMeshWidth; column++) {
+      const u = column / (terrainMeshWidth - 1);
+      const v = row / (terrainMeshHeight - 1);
+      const gridX = u * (gridWidth - 1);
+      const gridZ = v * (gridHeight - 1);
+      const elevation = sampleGrid(elevations, gridWidth, gridHeight, gridX, gridZ);
+      terrainPositions.push(-widthMeters / 2 + u * widthMeters, elevation - baseElevation, -depthMeters / 2 + v * depthMeters);
+      terrainUvs.push(u, 1 - v);
+      if (column < terrainMeshWidth - 1 && row < terrainMeshHeight - 1) {
+        const a = row * terrainMeshWidth + column;
+        terrainIndices.push(a, a + terrainMeshWidth, a + 1, a + 1, a + terrainMeshWidth, a + terrainMeshWidth + 1);
       }
     }
   }
@@ -125,12 +132,16 @@ function appendRoadStrip(bucket, points, width, getElevation) {
 function elevationAt(x, z, grid, bounds, gridWidth, gridHeight, baseElevation) {
   const u = THREE.MathUtils.clamp((x + bounds.widthMeters / 2) / bounds.widthMeters, 0, 1) * (gridWidth - 1);
   const v = THREE.MathUtils.clamp((z + bounds.depthMeters / 2) / bounds.depthMeters, 0, 1) * (gridHeight - 1);
+  return sampleGrid(grid, gridWidth, gridHeight, u, v) - baseElevation;
+}
+
+function sampleGrid(grid, gridWidth, gridHeight, u, v) {
   const x0 = Math.floor(u), z0 = Math.floor(v);
   const x1 = Math.min(gridWidth - 1, x0 + 1), z1 = Math.min(gridHeight - 1, z0 + 1);
   const tx = u - x0, tz = v - z0;
   const top = THREE.MathUtils.lerp(grid[z0 * gridWidth + x0], grid[z0 * gridWidth + x1], tx);
   const bottom = THREE.MathUtils.lerp(grid[z1 * gridWidth + x0], grid[z1 * gridWidth + x1], tx);
-  return THREE.MathUtils.lerp(top, bottom, tz) - baseElevation;
+  return THREE.MathUtils.lerp(top, bottom, tz);
 }
 
 function nearestOnSegment(x, z, ax, az, bx, bz) {
