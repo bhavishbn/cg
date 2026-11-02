@@ -1,47 +1,66 @@
 import * as THREE from 'three';
 
-const ROAD_TYPES = ['primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'service', 'pedestrian'];
-const ROAD_WIDTHS = { primary: 9, secondary: 7.4, tertiary: 6.2, unclassified: 5.6, residential: 5.2, living_street: 4.8, service: 3.7, pedestrian: 2.8 };
-const ROAD_COLORS = { primary: '#555755', secondary: '#505351', tertiary: '#4b4e4c', unclassified: '#484c4a', residential: '#444846', living_street: '#414543', service: '#3d413f', pedestrian: '#777b76' };
+const ROAD_TYPES = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'service', 'track', 'pedestrian'];
+const ROAD_WIDTHS = { motorway: 12, trunk: 10, primary: 9, secondary: 7.4, tertiary: 6.2, unclassified: 5.6, residential: 5.2, living_street: 4.8, service: 3.7, track: 4.4, pedestrian: 2.8 };
+const ROAD_COLORS = { motorway: '#777875', trunk: '#666966', primary: '#555755', secondary: '#505351', tertiary: '#4b4e4c', unclassified: '#484c4a', residential: '#444846', living_street: '#414543', service: '#3d413f', track: '#514f48', pedestrian: '#777b76' };
 const ROAD_SURFACE_OFFSET = 0.06;
 
 export function createMapRoads(scene, roadData, terrainData) {
-  const [west, south, east, north] = roadData.bbox;
+  const roadPoints = roadData.roads.flatMap(road => road.points);
+  const sourceBounds = roadData.bbox;
+  const [west, south, east, north] = roadPoints.length
+    ? [
+        Math.min(sourceBounds[0], ...roadPoints.map(point => point.lon)),
+        Math.min(sourceBounds[1], ...roadPoints.map(point => point.lat)),
+        Math.max(sourceBounds[2], ...roadPoints.map(point => point.lon)),
+        Math.max(sourceBounds[3], ...roadPoints.map(point => point.lat)),
+      ]
+    : sourceBounds;
   const centerLat = (south + north) * 0.5;
   const centerLon = (west + east) * 0.5;
   const xMetersPerDegree = 111320 * Math.cos(THREE.MathUtils.degToRad(centerLat));
   const zMetersPerDegree = 111320;
   const widthMeters = (east - west) * xMetersPerDegree;
   const depthMeters = (north - south) * zMetersPerDegree;
+  const [terrainWest, terrainSouth, terrainEast, terrainNorth] = terrainData?.bounds ?? roadData.bbox;
   const sourceElevations = terrainData?.elevations ?? new Array(17 * 25).fill(1050);
   const gridWidth = terrainData?.width ?? 17;
   const gridHeight = terrainData?.height ?? 25;
-  const elevations = smoothElevationGrid(sourceElevations, gridWidth, gridHeight, 2);
-  const elevationScale = 0.01;
-  const baseElevation = Math.min(...elevations);
+  const elevations = smoothElevationGrid(sourceElevations, gridWidth, gridHeight, gridWidth * gridHeight > 100_000 ? 0 : 1);
+  // DEM values are metres above sea level. Keep gameplay and the rendered
+  // terrain in real metre units so the road, ground contact, and car agree.
+  const elevationScale = 1;
+  let baseElevation = Infinity;
+  for (const elevation of elevations) baseElevation = Math.min(baseElevation, elevation);
   const bounds = { west, south, east, north, widthMeters, depthMeters, centerLat, centerLon, xMetersPerDegree, zMetersPerDegree };
   const group = new THREE.Group();
-  group.name = 'Chamonix OpenStreetMap and Copernicus terrain';
+  group.name = 'Chamonix–Argentière OpenStreetMap and Tilezen terrain';
 
   const terrainGeometry = new THREE.BufferGeometry();
   const terrainPositions = [];
   const terrainUvs = [];
   const terrainIndices = [];
-  const terrainSubdivisions = 5;
+  // Keep the large valley grid at its source density so the terrain stays
+  // detailed without multiplying more than 640,000 elevation vertices.
+  const terrainSubdivisions = gridWidth * gridHeight > 100_000 ? 1 : 8;
   const terrainMeshWidth = (gridWidth - 1) * terrainSubdivisions + 1;
   const terrainMeshHeight = (gridHeight - 1) * terrainSubdivisions + 1;
   for (let row = 0; row < terrainMeshHeight; row++) {
     for (let column = 0; column < terrainMeshWidth; column++) {
       const u = column / (terrainMeshWidth - 1);
       const v = row / (terrainMeshHeight - 1);
-      const gridX = u * (gridWidth - 1);
-      const gridZ = v * (gridHeight - 1);
+      const longitude = THREE.MathUtils.lerp(terrainWest, terrainEast, u);
+      const latitude = THREE.MathUtils.lerp(terrainNorth, terrainSouth, v);
+      const gridX = (longitude - terrainWest) / (terrainEast - terrainWest) * (gridWidth - 1);
+      const gridZ = (terrainNorth - latitude) / (terrainNorth - terrainSouth) * (gridHeight - 1);
       const elevation = sampleGrid(elevations, gridWidth, gridHeight, gridX, gridZ);
-      terrainPositions.push(-widthMeters / 2 + u * widthMeters, (elevation - baseElevation) * elevationScale, -depthMeters / 2 + v * depthMeters);
+      const x = (longitude - centerLon) * xMetersPerDegree;
+      const z = -(latitude - centerLat) * zMetersPerDegree;
+      terrainPositions.push(x, (elevation - baseElevation) * elevationScale, z);
       terrainUvs.push(u, 1 - v);
       if (column < terrainMeshWidth - 1 && row < terrainMeshHeight - 1) {
         const a = row * terrainMeshWidth + column;
-        terrainIndices.push(a, a + terrainMeshWidth, a + 1, a + 1, a + terrainMeshWidth, a + terrainMeshWidth + 1);
+        terrainIndices.push(a, a + terrainMeshWidth + 1, a + 1, a, a + terrainMeshWidth, a + terrainMeshWidth + 1);
       }
     }
   }
@@ -49,10 +68,11 @@ export function createMapRoads(scene, roadData, terrainData) {
   terrainGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(terrainUvs, 2));
   terrainGeometry.setIndex(terrainIndices);
   terrainGeometry.computeVertexNormals();
-  const aerialTexture = new THREE.TextureLoader().load('/data/chamonix-aerial.jpg');
+  const aerialTexture = new THREE.TextureLoader().load('/data/chamonix-valley-imagery.jpg');
   aerialTexture.colorSpace = THREE.SRGBColorSpace;
   aerialTexture.anisotropy = 8;
-  const terrain = new THREE.Mesh(terrainGeometry, new THREE.MeshStandardMaterial({ map: aerialTexture, color: '#ffffff', roughness: 1, side: THREE.DoubleSide }));
+  const terrainMaterial = new THREE.MeshStandardMaterial({ map: aerialTexture, color: '#e5e8df', roughness: 1, side: THREE.DoubleSide });
+  const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
   terrain.receiveShadow = true;
   group.add(terrain);
 
@@ -64,7 +84,8 @@ export function createMapRoads(scene, roadData, terrainData) {
     const bucket = buckets.get(road.type);
     if (!bucket || road.points.length < 2) continue;
     const points = road.points.map(point => project(point, bounds));
-    if (road.type !== 'pedestrian' && road.type !== 'service') {
+    for (const point of points) point.y = elevationAt(point.x, point.z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale);
+    if (road.type !== 'pedestrian' && road.type !== 'service' && road.type !== 'track') {
       for (let i = 0; i < points.length - 1; i++) segments.push([points[i].x, points[i].z, points[i + 1].x, points[i + 1].z]);
       for (let i = 0; i < points.length - 1; i++) {
         const a = points[i], b = points[i + 1];
@@ -97,8 +118,8 @@ export function createMapRoads(scene, roadData, terrainData) {
     bounds,
     spawn: spawn ?? { x: 0, z: 0, yaw: 0, y: 0 },
     roadCount: roadData.roads.length,
-    getElevationAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale),
-    getGroundHeightAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale) + ROAD_SURFACE_OFFSET,
+    getElevationAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale, { west: terrainWest, south: terrainSouth, east: terrainEast, north: terrainNorth }),
+    getGroundHeightAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale, { west: terrainWest, south: terrainSouth, east: terrainEast, north: terrainNorth }) + ROAD_SURFACE_OFFSET,
     isClearOfRoads: (x, z, margin = 18) => segments.every(([ax, az, bx, bz]) => {
       const nearest = nearestOnSegment(x, z, ax, az, bx, bz);
       return nearest.distanceSquared > margin * margin;
@@ -109,6 +130,7 @@ export function createMapRoads(scene, roadData, terrainData) {
 function project(point, bounds) {
   return {
     x: (point.lon - bounds.centerLon) * bounds.xMetersPerDegree,
+    y: 0,
     z: -(point.lat - bounds.centerLat) * bounds.zMetersPerDegree,
   };
 }
@@ -133,9 +155,11 @@ function appendRoadStrip(bucket, points, width, getElevation) {
   }
 }
 
-function elevationAt(x, z, grid, bounds, gridWidth, gridHeight, baseElevation, elevationScale = 1) {
-  const u = THREE.MathUtils.clamp((x + bounds.widthMeters / 2) / bounds.widthMeters, 0, 1) * (gridWidth - 1);
-  const v = THREE.MathUtils.clamp((z + bounds.depthMeters / 2) / bounds.depthMeters, 0, 1) * (gridHeight - 1);
+function elevationAt(x, z, grid, bounds, gridWidth, gridHeight, baseElevation, elevationScale = 1, terrainBounds = bounds) {
+  const lat = bounds.centerLat - z / bounds.zMetersPerDegree;
+  const lon = bounds.centerLon + x / bounds.xMetersPerDegree;
+  const u = THREE.MathUtils.clamp((lon - terrainBounds.west) / (terrainBounds.east - terrainBounds.west), 0, 1) * (gridWidth - 1);
+  const v = THREE.MathUtils.clamp((terrainBounds.north - lat) / (terrainBounds.north - terrainBounds.south), 0, 1) * (gridHeight - 1);
   return (sampleGrid(grid, gridWidth, gridHeight, u, v) - baseElevation) * elevationScale;
 }
 

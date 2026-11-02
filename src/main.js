@@ -9,8 +9,8 @@ let terrainData = null;
 let carModel = null;
 try {
   const [roadsResponse, terrainResponse] = await Promise.all([
-    fetch('/data/chamonix-roads.json'),
-    fetch('/data/chamonix-terrain.json'),
+    fetch('/data/chamonix-valley-roads.json'),
+    fetch('/data/chamonix-valley-terrain.json'),
   ]);
   if (!roadsResponse.ok || !terrainResponse.ok) throw new Error('Local Chamonix map files could not be loaded.');
   [mapData, terrainData] = await Promise.all([roadsResponse.json(), terrainResponse.json()]);

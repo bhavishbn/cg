@@ -11,8 +11,8 @@ export class Game {
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#a9c3cb');
-    this.scene.fog = new THREE.FogExp2('#a9c3cb', 0.00175);
-    this.camera = new THREE.PerspectiveCamera(54, 1, 0.1, 1500);
+    this.scene.fog = new THREE.FogExp2('#a9c3cb', 0.00018);
+    this.camera = new THREE.PerspectiveCamera(54, 1, 0.1, 24000);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     this.renderer.shadowMap.enabled = true;

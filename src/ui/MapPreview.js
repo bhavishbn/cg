@@ -3,10 +3,17 @@ export class MapPreview {
     this.canvas = canvas;
     this.context = canvas.getContext('2d');
     this.roadData = roadData;
-    this.bounds = roadData.bbox;
-    this.aerial = new Image();
-    this.aerial.onload = () => this.draw();
-    this.aerial.src = '/data/chamonix-aerial.jpg';
+    const points = roadData.roads.flatMap(road => road.points);
+    const [west, south, east, north] = roadData.bbox;
+    this.bounds = points.length ? [
+      Math.min(west, ...points.map(point => point.lon)),
+      Math.min(south, ...points.map(point => point.lat)),
+      Math.max(east, ...points.map(point => point.lon)),
+      Math.max(north, ...points.map(point => point.lat)),
+    ] : roadData.bbox;
+    this.mapImage = new Image();
+    this.mapImage.onload = () => this.draw();
+    this.mapImage.src = '/data/chamonix-valley-imagery.jpg';
     this.resizeObserver = new ResizeObserver(() => this.draw());
     this.resizeObserver.observe(canvas);
     this.car = null;
@@ -24,12 +31,12 @@ export class MapPreview {
     canvas.height = Math.round(height * ratio);
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
-    if (this.aerial.complete && this.aerial.naturalWidth) {
-      context.drawImage(this.aerial, 0, 0, width, height);
-      context.fillStyle = 'rgba(8, 18, 14, 0.26)';
-      context.fillRect(0, 0, width, height);
+    if (this.mapImage.complete && this.mapImage.naturalWidth) {
+      context.drawImage(this.mapImage, 0, 0, width, height);
     } else {
-      context.fillStyle = '#14221c';
+      const sky = context.createLinearGradient(0, 0, width, height);
+      sky.addColorStop(0, '#192d2a'); sky.addColorStop(1, '#101b1b');
+      context.fillStyle = sky;
       context.fillRect(0, 0, width, height);
     }
     const [west, south, east, north] = this.bounds;
@@ -39,11 +46,11 @@ export class MapPreview {
     const project = point => [pad + (point.lon - west) / (east - west) * mapWidth, pad + (north - point.lat) / (north - south) * mapHeight];
 
     const style = {
-      service: ['rgba(242, 242, 232, .45)', 0.55], pedestrian: ['rgba(242, 242, 232, .48)', 0.5],
-      residential: ['#f3f1e8', 1], living_street: ['#f3f1e8', 1], unclassified: ['#f7f4e8', 1.1],
-      tertiary: ['#fff8e6', 1.4], secondary: ['#ffe0a1', 1.8], primary: ['#ffd17b', 2.1],
+      service: ['rgba(126, 156, 139, .38)', 0.6], track: ['rgba(206, 193, 162, .68)', 0.75], pedestrian: ['rgba(126, 156, 139, .42)', 0.55],
+      residential: ['#b6c7b9', 1], living_street: ['#b6c7b9', 1], unclassified: ['#e6ddc1', 1.1],
+      tertiary: ['#f4edda', 1.45], secondary: ['#f8ce84', 1.9], primary: ['#ffb957', 2.2], trunk: ['#ffc06a', 2.35], motorway: ['#ff9d62', 2.5],
     };
-    for (const type of ['service', 'pedestrian', 'residential', 'living_street', 'unclassified', 'tertiary', 'secondary', 'primary']) {
+    for (const type of ['service', 'track', 'pedestrian', 'residential', 'living_street', 'unclassified', 'tertiary', 'secondary', 'primary', 'trunk', 'motorway']) {
       const [color, lineWidth] = style[type];
       context.beginPath();
       for (const road of roadData.roads) {
@@ -62,9 +69,31 @@ export class MapPreview {
       context.stroke();
     }
 
-    context.fillStyle = '#e8f2dd';
-    context.font = '8px "DM Mono", monospace';
-    context.fillText('CHAMONIX', pad + 4, height - pad - 5);
+    const roadPoints = roadData.roads.flatMap(road => road.points);
+    if (roadPoints.length) {
+      let north = -Infinity, south = Infinity;
+      for (const point of roadPoints) { north = Math.max(north, point.lat); south = Math.min(south, point.lat); }
+      const labelY = pad + (north - (north * .7 + south * .3)) / (north - south || 1) * mapHeight;
+      const labelX = pad + ((6.869 - west) / (east - west || 1)) * mapWidth;
+      context.save();
+      context.font = '700 8px "DM Mono", monospace';
+      context.textAlign = 'center';
+      context.fillStyle = 'rgba(216,235,222,.66)';
+      context.fillText('CHAMONIX', labelX, labelY);
+      context.font = '6px "DM Mono", monospace';
+      context.fillStyle = 'rgba(193,213,201,.42)';
+      context.fillText('LES PRAZ', labelX + 27, labelY - 23);
+      const place = (text, lon, lat) => {
+        const x = pad + (lon - west) / (east - west || 1) * mapWidth;
+        const y = pad + (north - lat) / (north - south || 1) * mapHeight;
+        context.fillText(text, x, y);
+      };
+      place('ARGENTIERE', 6.93, 45.98);
+      place('LES HOUCHES', 6.80, 45.89);
+      context.fillText('AIGUILLETTE DES POSSETTES', width * .73, height * .19);
+      context.restore();
+    }
+
     if (this.car) {
       const x = pad + (this.car.x / this.car.widthMeters + 0.5) * mapWidth;
       const y = pad + (this.car.z / this.car.depthMeters + 0.5) * mapHeight;
@@ -78,3 +107,4 @@ export class MapPreview {
     }
   }
 }
+
