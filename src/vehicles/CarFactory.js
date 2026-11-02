@@ -8,7 +8,7 @@ export function createCar(model = null) {
     model.name = 'Bugatti Chiron 2017';
     model.updateMatrixWorld(true);
     const modelBounds = new THREE.Box3().setFromObject(model);
-    const wheels = createFrontWheelPivots(model);
+    const wheels = createWheelPivots(model, modelBounds);
     model.traverse(object => {
       if (object.isMesh) {
         object.castShadow = true;
@@ -16,8 +16,14 @@ export function createCar(model = null) {
       }
     });
     chassis.add(model);
-    root.userData.groundOffset = 0.02 - modelBounds.min.y;
+    const center = modelBounds.getCenter(new THREE.Vector3());
+    const size = modelBounds.getSize(new THREE.Vector3());
+    chassis.position.set(-center.x, -center.y, -center.z);
+    root.userData.groundOffset = size.y * 0.5;
+    root.userData.contactHalfWidth = Math.max(0.65, size.x * 0.34);
+    root.userData.contactHalfLength = Math.max(1.2, size.z * 0.31);
     root.userData.wheels = wheels;
+    root.userData.damageMarks = addDamageMarks(root, size.x, size.z);
     return { root, chassis, wheels, model };
   }
 
@@ -47,6 +53,9 @@ export function createCar(model = null) {
     chassis.add(mirror);
   }
   addMesh(chassis, new THREE.BoxGeometry(1.23, 0.1, 0.28), darkPaint, [0, 1.67, -2.1]);
+  // Keep the root at chassis center so all four contact points can pitch and
+  // roll the whole vehicle around its suspension instead of around its floor.
+  chassis.position.y = -0.87;
   const wheels = [];
   for (const x of [-1.0, 1.0]) for (const z of [-1.46, 1.48]) {
     const pivot = new THREE.Group();
@@ -62,25 +71,63 @@ export function createCar(model = null) {
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.32, 12), darkPaint);
     hub.rotation.z = Math.PI / 2;
     pivot.add(hub);
-    wheels.push({ pivot, tire, front: z > 0 });
+    wheels.push({ pivot, tire, radius: 0.46, front: z < 0 });
   }
   root.position.set(-18, 0.48, -10);
   root.rotation.y = 0;
-  root.userData.groundOffset = 0.02;
+  root.userData.groundOffset = 0.87;
+  root.userData.contactHalfWidth = 0.84;
+  root.userData.contactHalfLength = 1.44;
   root.userData.wheels = wheels;
+  root.userData.damageMarks = addDamageMarks(root, 1.9, 4.7);
   return { root, chassis, wheels };
 }
 
-function createFrontWheelPivots(model) {
+function addDamageMarks(root, width, length) {
+  const material = new THREE.MeshStandardMaterial({ color: '#28221f', roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+  const marks = [];
+  for (const side of [-1, 1]) for (const z of [-0.31, 0.12, 0.48]) {
+    const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.2), material);
+    mark.position.set(side * width * 0.48, -0.04, z * length);
+    mark.rotation.y = side * Math.PI / 2;
+    mark.visible = false;
+    mark.castShadow = false;
+    root.add(mark);
+    marks.push(mark);
+  }
+  return marks;
+}
+
+function createWheelPivots(model, modelBounds) {
   const frontWheelMeshes = [];
   model.traverse(object => {
     if (object.isMesh && /Cube\.046|Cube\.048/i.test(object.name)) frontWheelMeshes.push(object);
   });
 
+  // The supplied Chiron file separates only one axle into wheel meshes.
+  // Duplicate its left/right wheel assemblies onto the other axle so all four
+  // wheels can steer (front) and roll visibly while driving.
+  if (frontWheelMeshes.length === 2) {
+    const averageZ = frontWheelMeshes.reduce((sum, wheel) => sum + new THREE.Box3().setFromObject(wheel).getCenter(new THREE.Vector3()).z, 0) / frontWheelMeshes.length;
+    const wheelbase = modelBounds.getSize(new THREE.Vector3()).z * 0.56;
+    const offset = averageZ >= 0 ? -wheelbase : wheelbase;
+    for (const original of [...frontWheelMeshes]) {
+      const duplicate = original.clone();
+      duplicate.name = `${original.name} opposite axle`;
+      duplicate.position.z += offset;
+      model.add(duplicate);
+      frontWheelMeshes.push(duplicate);
+    }
+  }
+
   const modelWorldInverse = model.matrixWorld.clone().invert();
-  return frontWheelMeshes.map(wheelMesh => {
+  const centers = frontWheelMeshes.map(wheelMesh => {
     const bounds = new THREE.Box3().setFromObject(wheelMesh);
     const center = bounds.getCenter(new THREE.Vector3()).applyMatrix4(modelWorldInverse);
+    return { wheelMesh, center, bounds };
+  });
+  const averageZ = centers.reduce((sum, wheel) => sum + wheel.center.z, 0) / centers.length;
+  return centers.map(({ wheelMesh, center, bounds }) => {
     const size = bounds.getSize(new THREE.Vector3());
     const pivot = new THREE.Group();
     pivot.name = `${wheelMesh.name} steering pivot`;
@@ -90,7 +137,7 @@ function createFrontWheelPivots(model) {
     rollPivot.name = `${wheelMesh.name} roll pivot`;
     pivot.add(rollPivot);
     rollPivot.attach(wheelMesh);
-    return { pivot, rollPivot, radius: Math.max(size.y, size.z) * 0.5, front: true };
+    return { pivot, rollPivot, radius: Math.max(size.y, size.z) * 0.5, front: center.z < averageZ - 0.2 };
   });
 }
 

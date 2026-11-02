@@ -78,6 +78,9 @@ export function createMapRoads(scene, roadData, terrainData) {
 
   const buckets = new Map(ROAD_TYPES.map(type => [type, { positions: [], indices: [] }]));
   const segments = [];
+  const roadPaths = [];
+  const roadCells = new Map();
+  const roadCellSize = 36;
   let spawn = null;
   let spawnDistance = Infinity;
   for (const road of roadData.roads) {
@@ -85,8 +88,25 @@ export function createMapRoads(scene, roadData, terrainData) {
     if (!bucket || road.points.length < 2) continue;
     const points = road.points.map(point => project(point, bounds));
     for (const point of points) point.y = elevationAt(point.x, point.z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale);
+    if (road.type !== 'pedestrian') {
+      const roadWidth = ROAD_WIDTHS[road.type] ?? 4;
+      roadPaths.push({ type: road.type, width: roadWidth, points });
+      for (let i = 0; i < points.length - 1; i++) {
+        const segment = { ax: points[i].x, az: points[i].z, bx: points[i + 1].x, bz: points[i + 1].z, width: roadWidth, type: road.type };
+        segments.push(segment);
+        const length = Math.hypot(segment.bx - segment.ax, segment.bz - segment.az);
+        const steps = Math.max(1, Math.ceil(length / (roadCellSize * 0.55)));
+        for (let step = 0; step <= steps; step++) {
+          const t = step / steps;
+          const cx = Math.floor(THREE.MathUtils.lerp(segment.ax, segment.bx, t) / roadCellSize);
+          const cz = Math.floor(THREE.MathUtils.lerp(segment.az, segment.bz, t) / roadCellSize);
+          const key = `${cx},${cz}`;
+          if (!roadCells.has(key)) roadCells.set(key, []);
+          roadCells.get(key).push(segment);
+        }
+      }
+    }
     if (road.type !== 'pedestrian' && road.type !== 'service' && road.type !== 'track') {
-      for (let i = 0; i < points.length - 1; i++) segments.push([points[i].x, points[i].z, points[i + 1].x, points[i + 1].z]);
       for (let i = 0; i < points.length - 1; i++) {
         const a = points[i], b = points[i + 1];
         const nearest = nearestOnSegment(0, 0, a.x, a.z, b.x, b.z);
@@ -116,15 +136,44 @@ export function createMapRoads(scene, roadData, terrainData) {
   return {
     group,
     bounds,
+    roadPaths,
     spawn: spawn ?? { x: 0, z: 0, yaw: 0, y: 0 },
     roadCount: roadData.roads.length,
     getElevationAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale, { west: terrainWest, south: terrainSouth, east: terrainEast, north: terrainNorth }),
     getGroundHeightAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale, { west: terrainWest, south: terrainSouth, east: terrainEast, north: terrainNorth }) + ROAD_SURFACE_OFFSET,
-    isClearOfRoads: (x, z, margin = 18) => segments.every(([ax, az, bx, bz]) => {
-      const nearest = nearestOnSegment(x, z, ax, az, bx, bz);
-      return nearest.distanceSquared > margin * margin;
-    }),
+    getRoadInfoAt: (x, z) => {
+      const nearby = getNearbyRoadSegments(x, z, roadCells, roadCellSize, 1);
+      let nearestDistance = Infinity;
+      let nearestWidth = 0;
+      let nearestType = null;
+      for (const segment of nearby) {
+        const nearest = nearestOnSegment(x, z, segment.ax, segment.az, segment.bx, segment.bz);
+        if (nearest.distanceSquared < nearestDistance) {
+          nearestDistance = nearest.distanceSquared;
+          nearestWidth = segment.width;
+          nearestType = segment.type;
+        }
+      }
+      const distance = Math.sqrt(nearestDistance);
+      return { onRoad: distance <= nearestWidth * 0.5 + 1.5, distance, width: nearestWidth, type: nearestType };
+    },
+    isClearOfRoads: (x, z, margin = 18) => {
+      const range = Math.ceil(margin / roadCellSize) + 1;
+      for (const segment of getNearbyRoadSegments(x, z, roadCells, roadCellSize, range)) {
+        if (nearestOnSegment(x, z, segment.ax, segment.az, segment.bx, segment.bz).distanceSquared <= margin * margin) return false;
+      }
+      return true;
+    },
   };
+}
+
+function getNearbyRoadSegments(x, z, cells, cellSize, range) {
+  const found = new Set();
+  const cx = Math.floor(x / cellSize), cz = Math.floor(z / cellSize);
+  for (let dz = -range; dz <= range; dz++) for (let dx = -range; dx <= range; dx++) {
+    for (const segment of cells.get(`${cx + dx},${cz + dz}`) ?? []) found.add(segment);
+  }
+  return found;
 }
 
 function project(point, bounds) {

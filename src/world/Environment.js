@@ -3,6 +3,7 @@ import { createTrack } from './Track.js';
 import { createMapRoads } from './MapRoads.js';
 import { addForest } from './Forest.js';
 import { addMountains } from './Mountains.js';
+import { addValleyScenery } from './Scenery.js';
 
 export function createEnvironment(scene, mapData, terrainData) {
   const hemisphere = new THREE.HemisphereLight('#e1f1ed', '#53645a', 2.0);
@@ -26,15 +27,17 @@ export function createEnvironment(scene, mapData, terrainData) {
   scene.add(ground);
 
   let track;
+  let scenery = { collisionObjects: [], counts: { buildings: 0, trees: 0, rocks: 0 } };
   if (mapData && terrainData) {
     track = createMapRoads(scene, mapData, terrainData);
+    scenery = addValleyScenery(scene, track);
   } else {
     addMountains(scene);
     track = createTrack(scene);
     addRoadsideDetails(scene, track);
   }
   if (!mapData) addForest(scene, track, 290);
-  return { track, spawn: track.spawn };
+  return { track, spawn: track.spawn, scenery };
 }
 
 function addRoadsideDetails(scene, track) {

@@ -24,6 +24,7 @@ export class Game {
 
     const world = createEnvironment(this.scene, mapData, terrainData);
     this.track = world.track;
+    this.scenery = world.scenery;
     this.car = createCar(carModel);
     const spawnHeight = this.track.getGroundHeightAt
       ? this.track.getGroundHeightAt(world.spawn.x, world.spawn.z) + this.car.root.userData.groundOffset
@@ -31,7 +32,9 @@ export class Game {
     this.car.root.position.set(world.spawn.x, spawnHeight, world.spawn.z);
     this.car.root.rotation.y = world.spawn.yaw;
     this.scene.add(this.car.root);
-    this.vehicle = new VehicleController(this.car.root, this.track);
+    this.vehicle = new VehicleController(this.car.root, this.track, this.scenery?.collisionObjects);
+    this.onDamage = () => {};
+    this.vehicle.onDamage = event => this.onDamage(event);
     this.cameraManager = new CameraManager(this.camera, this.car.root);
     this.audio = new AudioManager();
     this.input = new InputManager({
@@ -73,6 +76,9 @@ export class Game {
         gear: this.vehicle.gear,
         steer: this.vehicle.input.steer,
         throttle: this.vehicle.input.throttle,
+        damage: this.vehicle.damage,
+        onRoad: this.vehicle.onRoad,
+        grade: this.vehicle.grade,
       });
       this.onPosition({ x: this.car.root.position.x, z: this.car.root.position.z, widthMeters: this.track.bounds?.widthMeters ?? 1, depthMeters: this.track.bounds?.depthMeters ?? 1 });
     }

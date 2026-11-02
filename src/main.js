@@ -49,6 +49,12 @@ function showToast(message) {
   toastTimeout = setTimeout(() => toast.classList.remove('visible'), 1800);
 }
 
+game.onDamage = ({ damage, kind }) => {
+  document.querySelector('#damage-value').textContent = `${Math.round(damage).toString().padStart(2, '0')}%`;
+  document.querySelector('#damage-fill').style.width = `${damage}%`;
+  showToast(`IMPACT · ${kind.toUpperCase()} DAMAGE ${Math.round(damage)}%`);
+};
+
 const cameraNames = ['MEDIUM CHASE', 'COCKPIT', 'REAR CHASE', 'TOP VIEW'];
 game.onCameraChange = mode => {
   app.classList.toggle('cockpit-view', mode === 1);
@@ -96,7 +102,7 @@ game.onPauseChange = paused => {
   }
 };
 
-game.onSpeed = ({ speed, rpm, gear, steer = 0, throttle = 0 }) => {
+game.onSpeed = ({ speed, rpm, gear, steer = 0, throttle = 0, damage = 0, onRoad = true, grade = 0 }) => {
   const roundedSpeed = String(Math.round(speed)).padStart(3, '0');
   const roundedRpm = Math.round(rpm);
   document.querySelector('#speed').textContent = roundedSpeed;
@@ -109,4 +115,7 @@ game.onSpeed = ({ speed, rpm, gear, steer = 0, throttle = 0 }) => {
   document.querySelector('#cockpit-boost').style.width = `${Math.round(throttle * 100)}%`;
   document.querySelector('#cockpit-rpm-needle').style.transform = `rotate(${-130 + Math.min(rpm / 8000, 1) * 260}deg)`;
   document.querySelector('#cockpit-wheel').style.setProperty('--steering-angle', `${steer * 125}deg`);
+  document.querySelector('#surface-state').textContent = !onRoad ? 'OFF ROAD · LOW GRIP' : grade > 0.055 ? 'ROAD · UPHILL LOAD' : grade < -0.055 ? 'ROAD · DOWNHILL' : 'ASPHALT GRIP';
+  document.querySelector('#damage-value').textContent = `${Math.round(damage).toString().padStart(2, '0')}%`;
+  document.querySelector('#damage-fill').style.width = `${damage}%`;
 };
