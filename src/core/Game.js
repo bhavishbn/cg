@@ -7,7 +7,7 @@ import { AudioManager } from '../audio/AudioManager.js';
 import { InputManager } from '../ui/InputManager.js';
 
 export class Game {
-  constructor(container, mapData = null, terrainData = null) {
+  constructor(container, mapData = null, terrainData = null, carModel = null) {
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#a9c3cb');
@@ -24,8 +24,11 @@ export class Game {
 
     const world = createEnvironment(this.scene, mapData, terrainData);
     this.track = world.track;
-    this.car = createCar();
-    this.car.root.position.set(world.spawn.x, world.spawn.y + (world.track.bounds ? 0.88 : 0.48), world.spawn.z);
+    this.car = createCar(carModel);
+    const spawnHeight = this.track.getGroundHeightAt
+      ? this.track.getGroundHeightAt(world.spawn.x, world.spawn.z) + this.car.root.userData.groundOffset
+      : 0.48;
+    this.car.root.position.set(world.spawn.x, spawnHeight, world.spawn.z);
     this.car.root.rotation.y = world.spawn.yaw;
     this.scene.add(this.car.root);
     this.vehicle = new VehicleController(this.car.root, this.track);
@@ -45,6 +48,7 @@ export class Game {
     this.onSpeed = () => {};
     this.onPosition = () => {};
     this.onPauseChange = () => {};
+    this.onCameraChange = () => {};
     this.resize = this.resize.bind(this);
     window.addEventListener('resize', this.resize);
     this.resize();
@@ -63,7 +67,13 @@ export class Game {
     this.speedTick += dt;
     if (this.speedTick > 0.08) {
       this.speedTick = 0;
-      this.onSpeed({ speed: Math.abs(this.vehicle.speed) * 3.6, rpm: this.vehicle.rpm, gear: this.vehicle.gear });
+      this.onSpeed({
+        speed: Math.abs(this.vehicle.speed) * 3.6,
+        rpm: this.vehicle.rpm,
+        gear: this.vehicle.gear,
+        steer: this.vehicle.input.steer,
+        throttle: this.vehicle.input.throttle,
+      });
       this.onPosition({ x: this.car.root.position.x, z: this.car.root.position.z, widthMeters: this.track.bounds?.widthMeters ?? 1, depthMeters: this.track.bounds?.depthMeters ?? 1 });
     }
   }
@@ -76,7 +86,13 @@ export class Game {
     this.renderer.setSize(width, height);
   }
 
-  cycleCamera() { this.cameraMode = (this.cameraMode + 1) % 2; }
+  cycleCamera() {
+    this.cameraMode = (this.cameraMode + 1) % 4;
+    // The supplied exterior-only model has no cockpit/interior meshes. Hide it
+    // from the driver camera so its hood and body panels cannot block the road.
+    if (this.car.model) this.car.model.visible = this.cameraMode !== 1;
+    this.onCameraChange(this.cameraMode);
+  }
   setPaused(value) { this.paused = value; this.clock.getDelta(); this.onPauseChange(value); }
   restart() { this.vehicle.reset(); this.input.setActive(true); this.setPaused(false); }
 }

@@ -69,7 +69,27 @@ export function createTrack(scene) {
   }
   scene.add(edges, centerLines);
   addGrid(scene, curve, roadWidth, startIndex);
-  return { curve, roadWidth, length: curve.getLength(), startIndex };
+  return {
+    curve,
+    roadWidth,
+    length: curve.getLength(),
+    startIndex,
+    getGroundHeightAt(x, z) {
+      let nearest = curve.getPointAt(0);
+      let nearestDistance = Infinity;
+      for (let i = 1; i <= divisions; i++) {
+        const point = curve.getPointAt(i / divisions);
+        const dx = point.x - x;
+        const dz = point.z - z;
+        const distance = dx * dx + dz * dz;
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearest = point;
+        }
+      }
+      return nearest.y + 0.025;
+    },
+  };
 }
 
 function addGrid(scene, curve, roadWidth, t) {

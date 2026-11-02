@@ -3,6 +3,7 @@ import * as THREE from 'three';
 const ROAD_TYPES = ['primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'service', 'pedestrian'];
 const ROAD_WIDTHS = { primary: 9, secondary: 7.4, tertiary: 6.2, unclassified: 5.6, residential: 5.2, living_street: 4.8, service: 3.7, pedestrian: 2.8 };
 const ROAD_COLORS = { primary: '#555755', secondary: '#505351', tertiary: '#4b4e4c', unclassified: '#484c4a', residential: '#444846', living_street: '#414543', service: '#3d413f', pedestrian: '#777b76' };
+const ROAD_SURFACE_OFFSET = 0.06;
 
 export function createMapRoads(scene, roadData, terrainData) {
   const [west, south, east, north] = roadData.bbox;
@@ -16,7 +17,7 @@ export function createMapRoads(scene, roadData, terrainData) {
   const gridWidth = terrainData?.width ?? 17;
   const gridHeight = terrainData?.height ?? 25;
   const elevations = smoothElevationGrid(sourceElevations, gridWidth, gridHeight, 2);
-  const elevationScale = 0.45;
+  const elevationScale = 0.01;
   const baseElevation = Math.min(...elevations);
   const bounds = { west, south, east, north, widthMeters, depthMeters, centerLat, centerLon, xMetersPerDegree, zMetersPerDegree };
   const group = new THREE.Group();
@@ -97,6 +98,7 @@ export function createMapRoads(scene, roadData, terrainData) {
     spawn: spawn ?? { x: 0, z: 0, yaw: 0, y: 0 },
     roadCount: roadData.roads.length,
     getElevationAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale),
+    getGroundHeightAt: (x, z) => elevationAt(x, z, elevations, bounds, gridWidth, gridHeight, baseElevation, elevationScale) + ROAD_SURFACE_OFFSET,
     isClearOfRoads: (x, z, margin = 18) => segments.every(([ax, az, bx, bz]) => {
       const nearest = nearestOnSegment(x, z, ax, az, bx, bz);
       return nearest.distanceSquared > margin * margin;
@@ -122,7 +124,7 @@ function appendRoadStrip(bucket, points, width, getElevation) {
     const length = Math.hypot(dx, dz) || 1;
     const sideX = dz / length * halfWidth;
     const sideZ = -dx / length * halfWidth;
-    const centerY = getElevation(points[i]) + 0.9;
+    const centerY = getElevation(points[i]) + ROAD_SURFACE_OFFSET;
     bucket.positions.push(points[i].x + sideX, centerY, points[i].z + sideZ, points[i].x - sideX, centerY, points[i].z - sideZ);
     if (i < points.length - 1) {
       const a = start + i * 2;

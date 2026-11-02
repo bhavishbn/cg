@@ -28,8 +28,48 @@
         <div class="telemetry-meta"><span id="gear" class="gear">N</span><span class="meta-divider"></span><span><span class="meta-label">ENGINE</span><br /><span id="rpm">0,000</span> <span class="meta-unit">RPM</span></span></div>
         <div class="rpm-meter"><div class="rpm-track"><span id="rpm-fill"></span><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="rpm-caption"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span></div></div>
       </section>
-      <aside class="controls-hint" id="controls-hint"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="hint-copy">DRIVE</span><span class="hint-separator"></span><span class="key">C</span><span class="hint-copy">CAMERA</span><span class="hint-separator"></span><span class="key">P</span><span class="hint-copy">PAUSE</span></aside>
-      <div class="corner-note"><span>45° 55′ 24″ N</span><span>06° 52′ 08″ E</span><span class="note-rule"></span><a class="map-credit" href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noreferrer">IMAGERY © ESRI · MAXAR · EARTHSTAR</a><a class="map-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OPENSTREETMAP CONTRIBUTORS</a><a class="map-credit note-muted" href="https://open-meteo.com/en/docs/elevation-api" target="_blank" rel="noreferrer">COPERNICUS DEM · OPEN-METEO</a></div>
+      <aside class="route-card" aria-label="Driving session">
+        <div class="route-card-top"><span><i class="live-dot"></i>FREE DRIVE</span><span>SESSION 01</span></div>
+        <h2>CHAMONIX <em>ALPINE RUN</em></h2>
+        <div class="route-card-bottom"><span>REAL ROADS · OPEN MAP</span><span>FRANCE <b>↗</b></span></div>
+      </aside>
+      <section id="cockpit-dashboard" aria-label="Chiron cockpit dashboard">
+        <div class="cockpit-shell">
+          <div class="cockpit-label"><span>BUGATTI <b>W16</b></span><span>SPORT&nbsp; · &nbsp;AWD</span></div>
+          <div class="cockpit-readout cockpit-readout-left">
+            <span class="readout-label">ENGINE / RPM</span>
+            <div class="tach-dial">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="tach-track" cx="60" cy="60" r="48" />
+                <circle class="tach-arc" cx="60" cy="60" r="48" />
+                <g class="tach-ticks"><path d="M60 9v8M34 16l4 7M15 36l8 4M9 60h8M103 60h8M97 36l-8 4M86 16l-4 7" /></g>
+                <g id="cockpit-rpm-needle" class="tach-needle"><path d="M60 60 39 28" /></g>
+                <circle class="tach-hub" cx="60" cy="60" r="4" />
+                <text x="60" y="83" text-anchor="middle">x1000</text>
+              </svg>
+              <span id="cockpit-rpm">0,850</span>
+            </div>
+          </div>
+          <div class="cockpit-readout cockpit-readout-right">
+            <span class="readout-label">VEHICLE SPEED</span>
+            <div class="cockpit-speed-row"><strong id="cockpit-speed">000</strong><span>KM/H</span></div>
+            <div class="cockpit-gear-row"><span>GEAR</span><b id="cockpit-gear">N</b><span class="dash-divider"></span><span>BOOST</span><i><span id="cockpit-boost"></span></i></div>
+          </div>
+          <svg id="cockpit-wheel" class="cockpit-wheel" viewBox="0 0 240 240" role="img" aria-label="Steering wheel">
+            <defs><linearGradient id="wheelMetal" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#b8c4c5"/><stop offset=".45" stop-color="#344044"/><stop offset="1" stop-color="#101719"/></linearGradient></defs>
+            <circle class="wheel-shadow" cx="120" cy="120" r="101"/>
+            <circle class="wheel-rim" cx="120" cy="120" r="91"/>
+            <circle class="wheel-inner" cx="120" cy="120" r="78"/>
+            <path class="wheel-spoke" d="M109 114 83 36h74l-26 78 47 51-15 15-43-40-43 40-15-15z"/>
+            <path class="wheel-stitch" d="M44 119a76 76 0 0 1 152 0"/>
+            <circle class="wheel-hub" cx="120" cy="120" r="31"/>
+            <path class="wheel-mark" d="m120 103 13 25h-26z"/>
+            <path class="wheel-control" d="M57 127h27m99 0h-27M68 143h14m90 0h-14"/>
+          </svg>
+        </div>
+      </section>
+      <aside class="controls-hint" id="controls-hint"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="hint-copy">DRIVE · S REVERSE</span><span class="hint-separator"></span><span class="key">C</span><span class="hint-copy">CAMERA</span><span class="hint-separator"></span><span class="key">P</span><span class="hint-copy">PAUSE</span></aside>
+      <div class="corner-note"><span>45° 55′ 24″ N</span><span>06° 52′ 08″ E</span><span class="note-rule"></span><a class="map-credit" href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noreferrer">IMAGERY © ESRI · MAXAR · EARTHSTAR</a><a class="map-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OPENSTREETMAP CONTRIBUTORS</a><a class="map-credit note-muted" href="https://open-meteo.com/en/docs/elevation-api" target="_blank" rel="noreferrer">COPERNICUS DEM · OPEN-METEO</a><span class="map-credit note-muted">BUGATTI CHIRON MODEL · BOB KIMANI (KIMZ AUTO)</span></div>
       <aside class="map-card" aria-label="Live satellite map preview"><div class="map-title"><span>SATELLITE MAP</span><span>LIVE</span></div><canvas id="map-preview" aria-label="Chamonix aerial imagery with mapped roads and car position"></canvas></aside>
       <div id="toast" class="toast" role="status"></div>
     </div>

@@ -1,9 +1,26 @@
 import * as THREE from 'three';
 
-export function createCar() {
+export function createCar(model = null) {
   const root = new THREE.Group();
   const chassis = new THREE.Group();
   root.add(chassis);
+  if (model) {
+    model.name = 'Bugatti Chiron 2017';
+    model.updateMatrixWorld(true);
+    const modelBounds = new THREE.Box3().setFromObject(model);
+    const wheels = createFrontWheelPivots(model);
+    model.traverse(object => {
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+    });
+    chassis.add(model);
+    root.userData.groundOffset = 0.02 - modelBounds.min.y;
+    root.userData.wheels = wheels;
+    return { root, chassis, wheels, model };
+  }
+
   const paint = new THREE.MeshPhysicalMaterial({ color: '#c9e94f', metalness: 0.72, roughness: 0.24, clearcoat: 1, clearcoatRoughness: 0.18 });
   const darkPaint = new THREE.MeshStandardMaterial({ color: '#1c2422', metalness: 0.65, roughness: 0.3 });
   const glass = new THREE.MeshPhysicalMaterial({ color: '#263b3d', metalness: 0.55, roughness: 0.16, transmission: 0.08, transparent: true, opacity: 0.92 });
@@ -49,8 +66,32 @@ export function createCar() {
   }
   root.position.set(-18, 0.48, -10);
   root.rotation.y = 0;
+  root.userData.groundOffset = 0.02;
   root.userData.wheels = wheels;
   return { root, chassis, wheels };
+}
+
+function createFrontWheelPivots(model) {
+  const frontWheelMeshes = [];
+  model.traverse(object => {
+    if (object.isMesh && /Cube\.046|Cube\.048/i.test(object.name)) frontWheelMeshes.push(object);
+  });
+
+  const modelWorldInverse = model.matrixWorld.clone().invert();
+  return frontWheelMeshes.map(wheelMesh => {
+    const bounds = new THREE.Box3().setFromObject(wheelMesh);
+    const center = bounds.getCenter(new THREE.Vector3()).applyMatrix4(modelWorldInverse);
+    const size = bounds.getSize(new THREE.Vector3());
+    const pivot = new THREE.Group();
+    pivot.name = `${wheelMesh.name} steering pivot`;
+    pivot.position.copy(center);
+    model.add(pivot);
+    const rollPivot = new THREE.Group();
+    rollPivot.name = `${wheelMesh.name} roll pivot`;
+    pivot.add(rollPivot);
+    rollPivot.attach(wheelMesh);
+    return { pivot, rollPivot, radius: Math.max(size.y, size.z) * 0.5, front: true };
+  });
 }
 
 function addMesh(parent, geometry, material, position, rotation = [0, 0, 0]) {
